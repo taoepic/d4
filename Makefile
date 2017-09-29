@@ -1,4 +1,4 @@
-BINS=test1
+BINS=test1 
 
 CC=g++
 AS=as
@@ -7,7 +7,7 @@ OBJS=d4.o d4asm.o
 all: $(BINS)
 
 $(BINS): $(BINS:%=%.o) $(OBJS)
-	$(CC) -static -o $@ $+ 
+	$(CC) -static -o $@ $(@:%=%.o) $(OBJS)
 
 %.o: %.cc
 	$(CC) $(CCFLAGS) -c $^ -o $@

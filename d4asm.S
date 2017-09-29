@@ -1,12 +1,13 @@
 .section .data
 norm_mtx4:
-	.byte 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1
+	.float 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1
 norm_mtx3:
-	.byte 1, 0, 0, 0, 1, 0, 0, 0, 1
+	.float 1, 0, 0, 0, 1, 0, 0, 0, 1
 
 .section .bss
-	.align 8
-	.lcomm _mat4_i1, 16*4
+	.align 16
+	.comm _vec4_i1, 4*4
+	.comm _mat4_i1, 16*4
 
 .macro swap_idx idx0, idx1
 	movl \idx0*4(%r9), %eax
@@ -21,6 +22,78 @@ norm_mtx3:
 .endm
 
 .section .text
+	.global mat4_normal
+mat4_normal:
+	movq $norm_mtx4, %rax
+	ret
+
+	.global mat3_normal
+mat3_normal:
+	movq $norm_mtx3, %rax
+	ret
+
+	.global has_avx
+has_avx:
+	push %rbp
+	push %rcx
+	movq %rsp, %rbp
+	movl $1, %eax
+	cpuid
+	testl $0x10000000, %ecx
+	jz _no_avx
+	movq $1, %rax
+	jmp _leave_has_avx
+_no_avx:
+	xorq %rax, %rax
+_leave_has_avx:
+	pop %rcx
+	pop %rbp
+	ret
+
+	.global vec4_dot_vec4
+vec4_dot_vec4:
+	movaps (%rdi), %xmm0
+	mulps (%rsi), %xmm0
+	movaps %xmm0, (%rdx)
+	ret
+
+	.global vec4_plus_vec4
+vec4_plus_vec4:
+	movaps (%rdi), %xmm0
+	addps (%rsi), %xmm0
+	movaps %xmm0, (%rdx)
+	ret
+	
+	.global vec3_dot_vec3
+vec3_dot_vec3:
+	push %rcx
+	movaps (%rdi), %xmm0
+	movaps (%rsi), %xmm1
+	mulps %xmm1, %xmm0
+	movq $_vec4_i1, %rsi
+	movaps %xmm0, (%rsi)
+	movq %rdx, %rdi
+	cld
+	movl $3, %ecx
+	rep movsd
+	pop %rcx
+	ret
+
+	.global vec3_plus_vec3
+vec3_plus_vec3:
+	push %rcx
+	movaps (%rdi), %xmm0
+	movaps (%rsi), %xmm1
+	addps %xmm1, %xmm0
+	movq $_vec4_i1, %rsi
+	movaps %xmm0, (%rsi)
+	movq %rdx, %rdi
+	cld
+	movl $3, %ecx
+	rep movsd
+	pop %rcx
+	ret
+
 	.global mat4_transverse
 mat4_transverse:
 	copy_idx 0, 0
@@ -52,8 +125,8 @@ mat4_transverse_inplace:
 	swap_idx 11, 14
 	ret
 
-	.global vec4_dot_mat4
-vec4_dot_mat4:
+	.global vec4_multiply_mat4
+vec4_multiply_mat4:
 	movss (%rdi), %xmm0
 	shufps $0, %xmm0, %xmm0			# m0, m0, m0, m0
 	movaps (%rsi), %xmm4			# n0, n1, n2, n3
@@ -76,8 +149,8 @@ vec4_dot_mat4:
 	movaps %xmm3, (%rdx)
 	ret
 
-	.global mat4_dot_mat4
-mat4_dot_mat4:
+	.global mat4_multiply_mat4
+mat4_multiply_mat4:
 # d0, d1, d2, d3
 	movss (%rdi), %xmm0
 	shufps $0, %xmm0, %xmm0			# m0, m0, m0, m0
